@@ -8,7 +8,10 @@ import threading
 
 from seashell.core.device import (
     Device,
-    DeviceHandler
+    DeviceHandler,
+    MODE_TCP,
+    MODE_DTCP,
+    MODE_HTTP
 )
 
 from badges.cmd import Command
@@ -48,6 +51,14 @@ class ExternalCommand(Command):
                         'help': "Kill running TCP listener.",
                         'action': 'store_true'
                     }
+                ),
+                (
+                    ('-m', '--mode'),
+                    {
+                        'help': "Mode to start listener in.",
+                        'choices': [MODE_TCP, MODE_DTCP, MODE_HTTP],
+                        'required': False
+                    }
                 )
             ]
         })
@@ -59,7 +70,7 @@ class ExternalCommand(Command):
         handler.start()
 
         def shutdown_submethod(handler):
-            self.print_process("Terminating TCP handler...")
+            self.print_process("Terminating listener handler...")
 
             try:
                 handler.stop()
@@ -92,10 +103,10 @@ class ExternalCommand(Command):
     def run(self, args):
         if args.kill:
             if args.port not in self.jobs:
-                self.print_error(f"No TCP listener running on port {str(args.port)}!")
+                self.print_error(f"No listener running on port {str(args.port)}!")
                 return
 
-            self.print_process(f"Killing TCP listener on port {str(args.port)}...")
+            self.print_process(f"Killing listener on port {str(args.port)}...")
 
             self.jobs[args.port].shutdown()
             self.jobs[args.port].join()
@@ -104,11 +115,16 @@ class ExternalCommand(Command):
             return
 
         if args.port in self.jobs:
-            self.print_warning("TCP listener is already running.")
+            self.print_warning("This listener is already running.")
             return
 
+        mode = MODE_TCP
+
+        if args.mode:
+            mode = args.mode
+
         handler = DeviceHandler(
-            args.host or '0.0.0.0', args.port, None)
+            args.host or '0.0.0.0', args.port, mode)
 
         job = Job(target=self.handle_device, args=(handler,))
         job.pass_job = True

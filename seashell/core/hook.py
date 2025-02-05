@@ -32,6 +32,11 @@ from alive_progress import alive_bar
 from pex.string import String
 
 from seashell.lib.config import Config
+from seashell.core.device import (
+    MODE_TCP,
+    MODE_HTTP,
+    MODE_DTCP
+)
 
 
 class Hook(Config):
@@ -42,17 +47,18 @@ class Hook(Config):
     """
 
     def __init__(self, host: Optional[str] = None,
-                 port: Optional[int] = None) -> None:
+                 port: Optional[int] = None, mode: str = MODE_TCP) -> None:
         """ Initialize device hook.
 
         :param Optional[str] host: host
         :param Optional[int] port: port
+        :param str mode: mode to use for payload
         :return None: None
         """
 
         if host and port:
             self.hash = String().base64_string(
-                f'tcp://{host}:{str(port)}', decode=True)
+                f'{mode}://{host}:{str(port)}', decode=True)
         else:
             self.hash = ''
 

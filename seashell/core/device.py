@@ -27,14 +27,19 @@ import socket
 from pex.arch import ARCH_AARCH64
 from pex.platform import OS_IPHONE, OS_MACOS
 from pex.proto.tcp import TCPListener
+from pex.proto.http import HTTPListener
 
-from pwny.session import PwnySession
+from pwny.session import PwnySession, PwnyHTTPSession
 
-from typing import Tuple
+from typing import Tuple, Any
 from badges import Badges
 
 from seashell.lib.config import Config
 from seashell.core.api import *
+
+MODE_TCP = "tcp"
+MODE_DTCP = "dtcp"
+MODE_HTTP = "http"
 
 
 class Device(Config, Badges):
@@ -126,26 +131,36 @@ class Device(Config, Badges):
         self.device.interact()
 
 
-class DeviceHandler(TCPListener, Badges):
+class DeviceHandler(Badges):
     """ Subclass of seashell.core module.
 
     This subclass of seashell.core module is intended for providing
     an implementation of device handler.
     """
 
-    def __init__(self, host: str, port: int, timeout: int = 10) -> None:
+    def __init__(self, host: str, port: int, mode: str = MODE_TCP) -> None:
         """ Start TCP listener on socket pair.
 
         :param str host: host to listen
         :param int port: port to listen
-        :param int timeout: listener timeout
+        :param str mode: listener mode (one of http, tcp, dtcp)
         :return None: None
+        :raises RuntimeError: with trailing error message
         """
 
-        super().__init__(host, port, timeout)
-
-        self.badges = Badges()
         self.address = ('', -1)
+        self.mode = mode
+
+        if mode in [MODE_TCP, MODE_DTCP]:
+            self.handler = TCPListener(host, port, None)
+            self.session = PwnySession
+
+        elif mode == MODE_HTTP:
+            self.handler = HTTPListener(host, port)
+            self.session = PwnyHTTPSession
+
+        else:
+            raise RuntimeError("Invalid listener mode specified!")
 
     def start(self) -> None:
         """ Start TCP listener.
@@ -153,26 +168,35 @@ class DeviceHandler(TCPListener, Badges):
         :return None: None
         """
 
-        self.print_process(f"Listening on TCP port {str(self.port)}...")
-        self.listen()
+        self.print_process(f"Listening on port {str(self.handler.port)}...")
+        self.handler.listen()
 
-    def wrap(self, client: socket.socket) -> Device:
-        """ Wrap socket with device object.
+    def stop(self) -> None:
+        """ Stop listener.
 
-        :param socket.socket client: client to wrap
+        :return None: None
+        """
+
+        self.handler.stop()
+
+    def wrap(self, client: Any, address: tuple) -> Device:
+        """ Wrap client with device object.
+
+        :param Any client: client to wrap
+        :param tuple address: client address
         :return Device: device instance
         """
 
-        session = PwnySession()
+        session = self.session()
         session.info.update({
-            'Host': self.address[0],
-            'Port': self.port,
+            'Host': address[0],
+            'Port': address[1],
         })
         session.open(client)
         session.identify()
 
         device = Device(session)
-        device.server = self.server
+        device.server = self.handler.server
         session.device = device
 
         return device
@@ -183,10 +207,29 @@ class DeviceHandler(TCPListener, Badges):
         :return Device: device instance
         """
 
-        self.accept()
-        device = self.wrap(self.client)
+        if self.mode == MODE_DTCP:
+            self.handler.accept()
+            egress = self.handler.client
+
+            self.handler.accept()
+            ingress = self.handler.client
+
+            client = (egress, ingress)
+            address = self.handler.address
+
+        elif self.mode == MODE_HTTP:
+            client = self.handler
+            address = self.handler.server
+
+        else:
+            self.handler.accept()
+
+            client = self.handler.client
+            address = self.handler.address
+
+        device = self.wrap(client, address)
 
         self.print_success(
-            f"New device connected - {self.address[0]}!")
+            f"New device connected - {address[0]}!")
 
         return device

